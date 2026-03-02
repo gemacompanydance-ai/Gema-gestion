@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gema Company — Sistema de Pagos</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0e0e0e; --surface:#181818; --surface2:#222222; --border:#2e2e2e;
+    --accent:#c9a84c; --accent2:#e8c96a; --text:#f0ece4; --text2:#8a857a;
+    --green:#4caf82; --red:#e07060; --radius:12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* ── CONFIG SCREEN ── */
+  #configScreen {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92);
+    z-index:9000; align-items:center; justify-content:center; padding:20px;
+  }
+  #configScreen.open { display:flex; }
+  .config-box {
+    background:var(--surface); border:1px solid var(--accent); border-radius:20px;
+    padding:40px; width:100%; max-width:520px;
+  }
+  .config-box h2 { font-family:'Playfair Display',serif; color:var(--accent); font-size:22px; margin-bottom:8px; }
+  .config-box p  { color:var(--text2); font-size:13px; margin-bottom:24px; line-height:1.6; }
+  .config-steps  { margin-bottom:24px; }
+  .config-step   { display:flex; gap:12px; margin-bottom:14px; align-items:flex-start; }
+  .step-num {
+    width:24px; height:24px; border-radius:50%; background:var(--accent); color:#0e0e0e;
+    font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .step-text { font-size:13px; color:var(--text); line-height:1.5; }
+  .step-text code {
+    background:var(--surface2); border:1px solid var(--border); border-radius:4px;
+    padding:1px 6px; font-size:12px; color:var(--accent2); font-family:monospace;
+  }
+  .config-input-wrap { display:flex; gap:8px; }
+  .config-input-wrap input {
+    flex:1; padding:11px 14px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:13px; font-family:'DM Sans',sans-serif; outline:none;
+    transition:border-color .2s;
+  }
+  .config-input-wrap input:focus { border-color:var(--accent); }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    display:flex; align-items:center; justify-content:center; min-height:100vh;
+    background:radial-gradient(ellipse at 60% 40%, #1a1508 0%, #0e0e0e 70%);
+  }
+  .login-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:20px;
+    padding:48px 40px; width:360px; text-align:center;
+    box-shadow:0 40px 80px rgba(0,0,0,0.6);
+  }
+  .login-logo { font-family:'Playfair Display',serif; font-size:26px; font-weight:900; color:var(--accent); margin-bottom:4px; letter-spacing:1px; }
+  .login-sub  { color:var(--text2); font-size:11px; letter-spacing:3px; text-transform:uppercase; margin-bottom:36px; }
+  .login-box input {
+    width:100%; padding:13px 16px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px;
+    margin-bottom:12px; outline:none; transition:border-color .2s;
+  }
+  .login-box input:focus { border-color:var(--accent); }
+  .login-error { color:var(--red); font-size:13px; margin-bottom:10px; display:none; }
+  .btn-config-link {
+    margin-top:16px; font-size:12px; color:var(--text2); cursor:pointer;
+    text-decoration:underline; background:none; border:none; font-family:'DM Sans',sans-serif;
+  }
+  .btn-config-link:hover { color:var(--accent); }
+
+  /* ── BUTTONS ── */
+  .btn-primary {
+    width:100%; padding:13px; background:var(--accent); color:#0e0e0e; border:none;
+    border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600;
+    cursor:pointer; transition:background .2s, transform .1s;
+  }
+  .btn-primary:hover { background:var(--accent2); transform:translateY(-1px); }
+  .btn-add {
+    display:flex; align-items:center; gap:8px; padding:8px 16px;
+    background:var(--accent); color:#0e0e0e; border:none; border-radius:8px;
+    font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:background .2s;
+  }
+  .btn-add:hover { background:var(--accent2); }
+  .btn-icon {
+    padding:6px 10px; border-radius:6px; border:1px solid var(--border);
+    background:transparent; color:var(--text2); cursor:pointer; font-size:12px;
+    font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap;
+  }
+  .btn-icon:hover          { border-color:var(--accent); color:var(--accent); }
+  .btn-icon.mark:hover     { border-color:var(--green); color:var(--green); }
+  .btn-icon:disabled       { opacity:.4; cursor:not-allowed; }
+
+  /* ── APP SHELL ── */
+  #appShell { display:none; }
+  .sidebar {
+    position:fixed; left:0; top:0; bottom:0; width:220px;
+    background:var(--surface); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:28px 0; z-index:100;
+  }
+  .sidebar-logo   { padding:0 24px 28px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+  .sidebar-logo .name { font-family:'Playfair Display',serif; font-size:17px; font-weight:900; color:var(--accent); letter-spacing:.5px; }
+  .sidebar-logo .user { font-size:11px; color:var(--text2); letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
+  .sidebar-logo .sync-status { font-size:10px; margin-top:6px; display:flex; align-items:center; gap:5px; }
+  .sync-dot { width:7px; height:7px; border-radius:50%; }
+  .sync-dot.ok     { background:var(--green); }
+  .sync-dot.error  { background:var(--red); }
+  .sync-dot.loading { background:var(--accent); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .nav-item {
+    display:flex; align-items:center; gap:12px; padding:12px 24px;
+    color:var(--text2); font-size:14px; cursor:pointer;
+    transition:color .2s, background .2s; border-left:3px solid transparent;
+  }
+  .nav-item:hover  { color:var(--text); background:var(--surface2); }
+  .nav-item.active { color:var(--accent); border-left-color:var(--accent); background:rgba(201,168,76,.06); }
+  .nav-item svg    { width:18px; height:18px; flex-shrink:0; }
+  .sidebar-bottom  { margin-top:auto; padding:0 24px; display:flex; flex-direction:column; gap:8px; }
+  .btn-logout {
+    width:100%; padding:10px; background:transparent; border:1px solid var(--border);
+    border-radius:8px; color:var(--text2); font-size:13px; cursor:pointer;
+    transition:all .2s; font-family:'DM Sans',sans-serif;
+  }
+  .btn-logout:hover { border-color:var(--red); color:var(--red); }
+  .btn-settings {
+    width:100%; padding:10px; background:transparent; border:1px solid var(--border);
+    border-radius:8px; color:var(--text2); font-size:13px; cursor:pointer;
+    transition:all .2s; font-family:'DM Sans',sans-serif;
+  }
+  .btn-settings:hover { border-color:var(--accent); color:var(--accent); }
+
+  .main { margin-left:220px; padding:32px; min-height:100vh; }
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* ── DASHBOARD ── */
+  .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; flex-wrap:wrap; gap:12px; }
+  .page-title  { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; }
+  .page-title span { color:var(--accent); }
+  .month-badge {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:6px 16px; font-size:13px; color:var(--text2); letter-spacing:1px; text-transform:uppercase;
+  }
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  .stat-card  { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 24px; }
+  .stat-label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:2px; margin-bottom:8px; }
+  .stat-value { font-family:'Playfair Display',serif; font-size:32px; font-weight:700; }
+  .stat-value.gold  { color:var(--accent); }
+  .stat-value.green { color:var(--green); }
+  .stat-value.red   { color:var(--red); }
+  .stat-value.white { color:var(--text); }
+
+  .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .section-title  { font-size:13px; text-transform:uppercase; letter-spacing:2px; color:var(--text2); }
+
+  /* ── TABLE ── */
+  .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    padding:12px 16px; font-size:11px; text-transform:uppercase; letter-spacing:2px;
+    color:var(--text2); text-align:left; background:var(--surface2); border-bottom:1px solid var(--border);
+  }
+  tbody tr { border-bottom:1px solid var(--border); transition:background .15s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:rgba(255,255,255,.02); }
+  tbody td { padding:14px 16px; font-size:14px; }
+  .badge {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;
+  }
+  .badge.pagado    { background:rgba(76,175,130,.12); color:var(--green); border:1px solid rgba(76,175,130,.2); }
+  .badge.pendiente { background:rgba(224,112,96,.12); color:var(--red);   border:1px solid rgba(224,112,96,.2); }
+  .badge .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .action-btns { display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* ── SEARCH ── */
+  .search-input {
+    padding:9px 14px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px;
+    outline:none; width:220px; transition:border-color .2s;
+  }
+  .search-input:focus { border-color:var(--accent); }
+
+  /* ── MODAL ── */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:32px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;
+  }
+  .modal-title  { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; margin-bottom:24px; }
+  .form-grid    { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-grid .full { grid-column:1/-1; }
+  .form-group   { display:flex; flex-direction:column; gap:6px; }
+  .form-label   { font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; }
+  .form-input {
+    padding:11px 14px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px;
+    outline:none; transition:border-color .2s;
+  }
+  .form-input:focus { border-color:var(--accent); }
+  .form-actions { display:flex; gap:10px; margin-top:24px; }
+  .btn-cancel {
+    flex:1; padding:12px; background:transparent; border:1px solid var(--border);
+    border-radius:8px; color:var(--text2); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; transition:all .2s;
+  }
+  .btn-cancel:hover { border-color:var(--text2); color:var(--text); }
+  .btn-save { flex:1; }
+
+  /* ── LOADING OVERLAY ── */
+  .loading-bar {
+    position:fixed; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+    background-size:200% 100%;
+    animation:shimmer 1.2s infinite;
+    z-index:9999; display:none;
+  }
+  .loading-bar.active { display:block; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* ── TOAST ── */
+  .toast {
+    position:fixed; bottom:24px; right:24px; background:var(--surface);
+    border:1px solid var(--accent); border-radius:10px; padding:14px 20px;
+    font-size:14px; z-index:9999; transform:translateY(80px); opacity:0;
+    transition:all .3s; pointer-events:none; max-width:320px;
+  }
+  .toast.show  { transform:translateY(0); opacity:1; }
+  .toast.error { border-color:var(--red); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state { text-align:center; padding:48px 24px; color:var(--text2); }
+  .empty-state .icon { font-size:40px; margin-bottom:12px; }
+  .empty-state p { font-size:14px; }
+
+  /* ── MOBILE ── */
+  @media(max-width:768px){
+    .sidebar { transform:translateX(-100%); transition:transform .3s; }
+    .sidebar.open { transform:translateX(0); }
+    .main { margin-left:0; padding:20px; padding-top:72px; }
+    .stats-row { grid-template-columns:1fr 1fr; }
+    .mobile-header {
+      position:fixed; top:0; left:0; right:0; height:56px;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 16px; z-index:90;
+    }
+    .hamburger { background:none; border:none; color:var(--text); cursor:pointer; font-size:22px; }
+    table { font-size:12px; }
+    thead th, tbody td { padding:10px 8px; }
+    .form-grid { grid-template-columns:1fr; }
+    .form-grid .full { grid-column:1; }
+    .search-input { width:160px; }
+  }
+  @media(min-width:769px){ .mobile-header { display:none; } }
+</style>
+</head>
+<body>
+
+<!-- LOADING BAR -->
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- ── CONFIG SCREEN ── -->
+<div id="configScreen">
+  <div class="config-box">
+    <h2>⚙ Conectar Google Sheets</h2>
+    <p>Pegá la URL de tu Web App de Google Apps Script para conectar la app con tu planilla.</p>
+    <div class="config-steps">
+      <div class="config-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Abrí tu Google Sheet → <code>Extensiones</code> → <code>Apps Script</code></div>
+      </div>
+      <div class="config-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Pegá el código del archivo <code>Code.gs</code> y guardá</div>
+      </div>
+      <div class="config-step">
+        <div class="step-num">3</div>
+        <div class="step-text">Corré la función <code>setupInicial()</code> una vez</div>
+      </div>
+      <div class="config-step">
+        <div class="step-num">4</div>
+        <div class="step-text">Hacé clic en <code>Implementar</code> → <code>Nueva implementación</code> → Tipo: <code>App web</code> → Acceso: <code>Cualquier usuario</code> → Copiar URL</div>
+      </div>
+      <div class="config-step">
+        <div class="step-num">5</div>
+        <div class="step-text">Pegá la URL acá abajo y hacé clic en <strong>Guardar y conectar</strong></div>
+      </div>
+    </div>
+    <div class="config-input-wrap">
+      <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/..." />
+      <button class="btn-primary" style="width:auto;padding:11px 20px;white-space:nowrap" onclick="saveScriptUrl()">Guardar y conectar</button>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn-config-link" onclick="useLocalMode()">Continuar sin conectar (modo local)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">Gema Company</div>
+    <div class="login-sub">Sistema de gestión</div>
+    <div class="login-error" id="loginError">Usuario o contraseña incorrectos</div>
+    <input type="text"     id="loginUser" placeholder="Usuario" />
+    <input type="password" id="loginPass" placeholder="Contraseña" />
+    <button class="btn-primary" onclick="doLogin()">Ingresar</button>
+    <br>
+    <button class="btn-config-link" onclick="openConfig()">⚙ Configurar Google Sheets</button>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="appShell">
+  <!-- Mobile header -->
+  <div class="mobile-header">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <span style="font-family:'Playfair Display',serif;color:var(--accent);font-weight:700;font-size:15px;">Gema Company</span>
+    <span></span>
+  </div>
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="name">Gema Company</div>
+      <div class="user">Bienvenida, Gema</div>
+      <div class="sync-status" id="syncStatus">
+        <span class="sync-dot loading" id="syncDot"></span>
+        <span id="syncText" style="color:var(--text2);font-size:10px;">Conectando...</span>
+      </div>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('alumnos',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Alumnos
+    </div>
+    <div class="sidebar-bottom">
+      <button class="btn-settings" onclick="openConfig()">⚙ Configuración</button>
+      <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Pagos <span id="mesActual"></span></div>
+        <div class="month-badge" id="monthBadge"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total Alumnos</div><div class="stat-value gold"  id="statTotal">—</div></div>
+        <div class="stat-card"><div class="stat-label">Pagados</div>      <div class="stat-value green" id="statPagados">—</div></div>
+        <div class="stat-card"><div class="stat-label">Pendientes</div>   <div class="stat-value red"   id="statPendientes">—</div></div>
+        <div class="stat-card"><div class="stat-label">Recaudado</div>    <div class="stat-value white" id="statMonto">—</div></div>
+      </div>
+      <div class="section-header">
+        <div class="section-title">Lista de Pagos</div>
+        <button class="btn-add" onclick="openModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Agregar alumno
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Nombre</th><th>Disciplina</th><th>Monto</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="dashTable"><tr><td colspan="5"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ALUMNOS -->
+    <div class="page" id="page-alumnos">
+      <div class="page-header">
+        <div class="page-title">Alumnos <span style="color:var(--accent)">Registrados</span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input class="search-input" placeholder="Buscar alumno..." id="searchInput" oninput="renderAlumnos()" />
+          <button class="btn-add" onclick="openModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuevo
+          </button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Nombre</th><th>Disciplina</th><th>Contacto</th><th>Email</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="alumnosTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL AGREGAR / EDITAR ALUMNO -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Nuevo Alumno</div>
+    <input type="hidden" id="fId" />
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Nombre completo *</label>
+        <input class="form-input" id="fNombre" placeholder="Ej: María García" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Disciplina *</label>
+        <select class="form-input" id="fDisciplina">
+          <option value="">Seleccionar...</option>
+          <option>Danza Clásica</option>
+          <option>Danza Contemporánea</option>
+          <option>Folklore</option>
+          <option>Hip Hop</option>
+          <option>Ritmos Latinos</option>
+          <option>Yoga</option>
+          <option>Pilates</option>
+          <option>Karate</option>
+          <option>Boxeo</option>
+          <option>Otra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Monto mensual ($) *</label>
+        <input class="form-input" id="fMonto" type="number" placeholder="Ej: 5000" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contacto</label>
+        <input class="form-input" id="fContacto" placeholder="Ej: 11 2345 6789" />
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="fEmail" type="email" placeholder="correo@mail.com" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary btn-save" id="btnGuardar" onclick="saveAlumno()">Agregar alumno</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIG & STATE
+// ════════════════════════════════════════════════════════════
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const now    = new Date();
+const MES    = MONTHS[now.getMonth()];
+const ANIO   = now.getFullYear();
+const MONTH_KEY = `${ANIO}-${now.getMonth()}`;
+
+// ▼▼▼ PEGÁ TU URL DE APPS SCRIPT ACÁ ▼▼▼
+let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyaxPcDB8H2FOgKO4dhLGwSVc8JC_YqSjtOl0vatwDXZtx8yZVHwKpjQ3vOZiOtFXlVZA/exec';
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+let LOCAL_MODE = (!SCRIPT_URL || SCRIPT_URL === 'PEGAR_URL_AQUI');
+let alumnos     = [];
+let pagos       = {};
+let loadingCount = 0;
+
+// ════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════
+function openConfig() { document.getElementById('configScreen').classList.add('open'); }
+function closeConfig(){ document.getElementById('configScreen').classList.remove('open'); }
+
+function saveScriptUrl() {
+  const url = document.getElementById('scriptUrlInput').value.trim();
+  if (!url.includes('script.google.com')) { showToast('⚠ URL inválida', true); return; }
+  SCRIPT_URL = url;
+  LOCAL_MODE  = false;
+  closeConfig();
+  showToast('✓ URL guardada — reconectando...');
+  if (document.getElementById('appShell').style.display !== 'none') loadAll();
+}
+
+function useLocalMode() {
+  LOCAL_MODE = true;
+  closeConfig();
+  showToast('Modo local activado (sin Sheets)');
+}
+
+// ════════════════════════════════════════════════════════════
+//  API
+// ════════════════════════════════════════════════════════════
+function setLoading(on) {
+  loadingCount += on ? 1 : -1;
+  loadingCount = Math.max(0, loadingCount);
+  document.getElementById('loadingBar').classList.toggle('active', loadingCount > 0);
+}
+
+async function apiGet(params) {
+  if (LOCAL_MODE) throw new Error('LOCAL_MODE');
+  setLoading(true);
+  try {
+    const qs  = new URLSearchParams({ ...params }).toString();
+    const res = await fetch(`${SCRIPT_URL}?${qs}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } finally { setLoading(false); }
+}
+
+async function apiPost(body) {
+  if (LOCAL_MODE) throw new Error('LOCAL_MODE');
+  setLoading(true);
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } finally { setLoading(false); }
+}
+
+// ════════════════════════════════════════════════════════════
+//  LOGIN
+// ════════════════════════════════════════════════════════════
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  if (u === 'Gema' && p === 'gema2003') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display   = 'block';
+    if (SCRIPT_URL) document.getElementById('scriptUrlInput').value = SCRIPT_URL;
+    init();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
+});
+
+function doLogout() {
+  document.getElementById('appShell').style.display   = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+// ════════════════════════════════════════════════════════════
+//  INIT & LOAD
+// ════════════════════════════════════════════════════════════
+function init() {
+  document.getElementById('mesActual').textContent = MES;
+  document.getElementById('monthBadge').textContent = `${MES} ${ANIO}`;
+  if (SCRIPT_URL) document.getElementById('scriptUrlInput').value = SCRIPT_URL;
+  loadAll();
+}
+
+async function loadAll() {
+  setSyncStatus('loading', 'Sincronizando...');
+  try {
+    if (LOCAL_MODE) {
+      // Cargar desde localStorage
+      alumnos = JSON.parse(localStorage.getItem('gema_alumnos') || '[]');
+      pagos   = JSON.parse(localStorage.getItem(`gema_pagos_${MONTH_KEY}`) || '{}');
+      if (!alumnos.length) seedDemoData();
+      setSyncStatus('error', 'Modo local');
+    } else {
+      const [resA, resP] = await Promise.all([
+        apiGet({ action: 'getAlumnos' }),
+        apiGet({ action: 'getPagos', mes: MES, anio: ANIO })
+      ]);
+      alumnos = resA.alumnos || [];
+      pagos   = resP.pagos   || {};
+      setSyncStatus('ok', 'Conectado a Sheets');
+    }
+    renderDash();
+    renderAlumnos();
+  } catch(e) {
+    setSyncStatus('error', 'Error de conexión');
+    // Fallback a localStorage
+    alumnos = JSON.parse(localStorage.getItem('gema_alumnos') || '[]');
+    pagos   = JSON.parse(localStorage.getItem(`gema_pagos_${MONTH_KEY}`) || '{}');
+    if (!alumnos.length) seedDemoData();
+    renderDash();
+    renderAlumnos();
+    showToast('⚠ Sin conexión — usando datos locales', true);
+  }
+}
+
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = `sync-dot ${state}`;
+  txt.textContent = text;
+}
+
+function seedDemoData() {
+  alumnos = [
+    { id:'1', nombre:'Lucía Fernández',  disciplina:'Danza Clásica',       monto:6000, contacto:'11 2345 6789', email:'lucia@mail.com' },
+    { id:'2', nombre:'Valentina Ríos',   disciplina:'Folklore',             monto:5500, contacto:'11 8765 4321', email:'vale@mail.com'  },
+    { id:'3', nombre:'Sofía Martínez',   disciplina:'Hip Hop',              monto:5000, contacto:'11 1111 2222', email:'sofi@mail.com'  },
+    { id:'4', nombre:'Camila López',     disciplina:'Danza Contemporánea',  monto:7000, contacto:'11 3333 4444', email:'cami@mail.com'  },
+  ];
+  saveLocal();
+}
+
+function saveLocal() {
+  localStorage.setItem('gema_alumnos', JSON.stringify(alumnos));
+  localStorage.setItem(`gema_pagos_${MONTH_KEY}`, JSON.stringify(pagos));
+}
+
+function getEstado(id) { return pagos[String(id)] || 'PENDIENTE'; }
+
+// ════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════════════════════
+function renderDash() {
+  const pagados = alumnos.filter(a => getEstado(a.id) === 'PAGADO');
+  const montoRecaudado = pagados.reduce((s, a) => s + Number(a.monto), 0);
+
+  document.getElementById('statTotal').textContent     = alumnos.length;
+  document.getElementById('statPagados').textContent   = pagados.length;
+  document.getElementById('statPendientes').textContent = alumnos.length - pagados.length;
+  document.getElementById('statMonto').textContent     = '$' + montoRecaudado.toLocaleString('es-AR');
+
+  const tb = document.getElementById('dashTable');
+  if (!alumnos.length) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="icon">🎓</div><p>No hay alumnos registrados todavía.</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = alumnos.map(a => {
+    const est      = getEstado(a.id);
+    const isPagado = est === 'PAGADO';
+    return `<tr>
+      <td><strong>${esc(a.nombre)}</strong></td>
+      <td style="color:var(--text2)">${esc(a.disciplina)}</td>
+      <td>$${Number(a.monto).toLocaleString('es-AR')}</td>
+      <td><span class="badge ${isPagado?'pagado':'pendiente'}"><span class="dot"></span>${est}</span></td>
+      <td><div class="action-btns">
+        ${!isPagado
+          ? `<button class="btn-icon mark" onclick="marcarEstado('${a.id}','PAGADO')">✓ Pagado</button>`
+          : `<button class="btn-icon" onclick="marcarEstado('${a.id}','PENDIENTE')">↩ Revertir</button>`}
+        <button class="btn-icon" onclick="generarRecibo('${a.id}')">📄 Recibo</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function marcarEstado(id, estado) {
+  // Optimista: actualizar UI primero
+  pagos[String(id)] = estado;
+  renderDash();
+  saveLocal();
+
+  if (!LOCAL_MODE) {
+    try {
+      await apiPost({ action:'updateEstado', id, estado, mes:MES, anio:ANIO });
+      showToast(estado === 'PAGADO' ? '✓ Pago registrado en Sheets' : 'Estado actualizado');
+    } catch(e) {
+      showToast('⚠ Guardado solo en local', true);
+    }
+  } else {
+    showToast(estado === 'PAGADO' ? '✓ Pago registrado' : 'Estado actualizado');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  ALUMNOS PAGE
+// ════════════════════════════════════════════════════════════
+function renderAlumnos() {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const filtrados = alumnos.filter(a =>
+    a.nombre.toLowerCase().includes(q) || a.disciplina.toLowerCase().includes(q)
+  );
+  const tb = document.getElementById('alumnosTable');
+  if (!filtrados.length) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🔍</div><p>No se encontraron alumnos.</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = filtrados.map(a => {
+    const est = getEstado(a.id);
+    return `<tr>
+      <td><strong>${esc(a.nombre)}</strong></td>
+      <td style="color:var(--text2)">${esc(a.disciplina)}</td>
+      <td style="color:var(--text2)">${esc(a.contacto||'—')}</td>
+      <td style="color:var(--text2)">${esc(a.email||'—')}</td>
+      <td><span class="badge ${est==='PAGADO'?'pagado':'pendiente'}"><span class="dot"></span>${est}</span></td>
+      <td><div class="action-btns">
+        <button class="btn-icon" onclick="editarAlumno('${a.id}')">✏ Editar</button>
+        <button class="btn-icon" onclick="generarRecibo('${a.id}')">📄 Recibo</button>
+        <button class="btn-icon" onclick="eliminarAlumno('${a.id}')" style="color:var(--red)">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════════
+function openModal(editId) {
+  document.getElementById('modalTitle').textContent   = editId ? 'Editar Alumno' : 'Nuevo Alumno';
+  document.getElementById('btnGuardar').textContent   = editId ? 'Guardar cambios' : 'Agregar alumno';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal()        { document.getElementById('modalOverlay').classList.remove('open'); clearForm(); }
+function closeModalOutside(e){ if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+function clearForm() {
+  ['fId','fNombre','fMonto','fContacto','fEmail'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('fDisciplina').value = '';
+}
+
+function editarAlumno(id) {
+  const a = alumnos.find(x => String(x.id) === String(id));
+  if (!a) return;
+  document.getElementById('fId').value         = a.id;
+  document.getElementById('fNombre').value     = a.nombre;
+  document.getElementById('fDisciplina').value = a.disciplina;
+  document.getElementById('fMonto').value      = a.monto;
+  document.getElementById('fContacto').value   = a.contacto || '';
+  document.getElementById('fEmail').value      = a.email    || '';
+  openModal(id);
+}
+
+async function saveAlumno() {
+  const id         = document.getElementById('fId').value;
+  const nombre     = document.getElementById('fNombre').value.trim();
+  const disciplina = document.getElementById('fDisciplina').value;
+  const monto      = document.getElementById('fMonto').value;
+  const contacto   = document.getElementById('fContacto').value.trim();
+  const email      = document.getElementById('fEmail').value.trim();
+
+  if (!nombre || !disciplina || !monto) { showToast('⚠ Completá los campos obligatorios', true); return; }
+
+  const btn = document.getElementById('btnGuardar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  if (id) {
+    // UPDATE
+    const alumno = { id, nombre, disciplina, monto:Number(monto), contacto, email };
+    const idx = alumnos.findIndex(a => String(a.id) === String(id));
+    if (idx > -1) alumnos[idx] = alumno;
+    saveLocal();
+    if (!LOCAL_MODE) {
+      try { await apiPost({ action:'updateAlumno', alumno }); showToast('✓ Alumno actualizado'); }
+      catch(e) { showToast('⚠ Guardado solo en local', true); }
+    } else { showToast('✓ Alumno actualizado'); }
+  } else {
+    // ADD
+    if (!LOCAL_MODE) {
+      try {
+        const res = await apiPost({ action:'addAlumno', alumno:{ nombre, disciplina, monto:Number(monto), contacto, email } });
+        alumnos.push({ id:res.id, nombre, disciplina, monto:Number(monto), contacto, email });
+        saveLocal();
+        showToast('✓ Alumno agregado en Sheets');
+      } catch(e) {
+        const newId = String(Date.now());
+        alumnos.push({ id:newId, nombre, disciplina, monto:Number(monto), contacto, email });
+        saveLocal();
+        showToast('⚠ Guardado solo en local', true);
+      }
+    } else {
+      const newId = String(Date.now());
+      alumnos.push({ id:newId, nombre, disciplina, monto:Number(monto), contacto, email });
+      saveLocal();
+      showToast('✓ Alumno agregado');
+    }
+  }
+
+  btn.disabled = false;
+  closeModal();
+  renderDash();
+  renderAlumnos();
+}
+
+async function eliminarAlumno(id) {
+  if (!confirm('¿Eliminar este alumno?')) return;
+  alumnos = alumnos.filter(a => String(a.id) !== String(id));
+  delete pagos[String(id)];
+  saveLocal();
+  if (!LOCAL_MODE) {
+    try { await apiPost({ action:'deleteAlumno', id }); showToast('Alumno eliminado'); }
+    catch(e) { showToast('⚠ Eliminado solo en local', true); }
+  } else { showToast('Alumno eliminado'); }
+  renderDash(); renderAlumnos();
+}
+
+// ════════════════════════════════════════════════════════════
+//  PDF RECIBO
+// ════════════════════════════════════════════════════════════
+function generarRecibo(id) {
+  const a = alumnos.find(x => String(x.id) === String(id));
+  if (!a) return;
+  const { jsPDF } = window.jspdf;
+  const doc   = new jsPDF({ unit:'mm', format:'a5' });
+  const fecha = `${now.getDate()} de ${MES} de ${ANIO}`;
+
+  // Fondo
+  doc.setFillColor(14,14,14);
+  doc.rect(0,0,148,210,'F');
+
+  // Borde dorado superior
+  doc.setFillColor(201,168,76);
+  doc.rect(0,0,148,3,'F');
+
+  // Nombre academia
+  doc.setTextColor(201,168,76);
+  doc.setFontSize(18);
+  doc.setFont('helvetica','bold');
+  doc.text('GEMA COMPANY', 74, 18, { align:'center' });
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(138,133,122);
+  doc.text('ACADEMIA DE DANZAS', 74, 25, { align:'center' });
+
+  // Línea separadora
+  doc.setDrawColor(46,46,46);
+  doc.setLineWidth(0.3);
+  doc.line(16,31,132,31);
+
+  // Subtítulo
+  doc.setTextColor(201,168,76);
+  doc.setFontSize(8);
+  doc.setFont('helvetica','bold');
+  doc.text('COMPROBANTE DE PAGO', 74, 39, { align:'center' });
+
+  // Número de recibo
+  doc.setTextColor(46,46,46);
+  doc.setFontSize(7);
+  doc.setFont('helvetica','normal');
+  doc.text(`N° ${Date.now().toString().slice(-6)}`, 74, 45, { align:'center' });
+
+  // Línea separadora 2
+  doc.line(16,49,132,49);
+
+  // Datos
+  const rows = [
+    ['ALUMNO/A', a.nombre],
+    ['DISCIPLINA', a.disciplina],
+    ['PERÍODO', `${MES} ${ANIO}`],
+    ['FECHA', fecha],
+  ];
+  let y = 60;
+  rows.forEach(([label, value]) => {
+    doc.setTextColor(138,133,122);
+    doc.setFontSize(7);
+    doc.setFont('helvetica','normal');
+    doc.text(label, 16, y);
+    doc.setTextColor(240,236,228);
+    doc.setFontSize(11);
+    doc.setFont('helvetica','bold');
+    doc.text(String(value), 16, y+7);
+    doc.setFont('helvetica','normal');
+    y += 20;
+  });
+
+  // Caja monto
+  y += 4;
+  doc.setFillColor(22,17,6);
+  doc.roundedRect(16,y,116,26,3,3,'F');
+  doc.setDrawColor(201,168,76);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(16,y,116,26,3,3,'S');
+  doc.setTextColor(138,133,122);
+  doc.setFontSize(7);
+  doc.text('MONTO ABONADO', 74, y+8, { align:'center' });
+  doc.setTextColor(201,168,76);
+  doc.setFontSize(22);
+  doc.setFont('helvetica','bold');
+  doc.text(`$${Number(a.monto).toLocaleString('es-AR')}`, 74, y+20, { align:'center' });
+
+  // Estado
+  y += 36;
+  const est      = getEstado(id);
+  const isPagado = est === 'PAGADO';
+  doc.setFillColor(isPagado ? 13 : 46, isPagado ? 46 : 13, isPagado ? 26 : 13);
+  doc.roundedRect(46,y,56,14,3,3,'F');
+  doc.setTextColor(isPagado ? 76 : 224, isPagado ? 175 : 112, isPagado ? 130 : 96);
+  doc.setFontSize(9);
+  doc.setFont('helvetica','bold');
+  doc.text(est, 74, y+9, { align:'center' });
+
+  // Footer
+  doc.setFont('helvetica','normal');
+  doc.setFillColor(201,168,76);
+  doc.rect(0,206,148,4,'F');
+  doc.setTextColor(138,133,122);
+  doc.setFontSize(6.5);
+  doc.text('Gema Company — Este comprobante es válido como constancia de pago.', 74, 202, { align:'center' });
+
+  doc.save(`Recibo_${a.nombre.replace(/\s+/g,'_')}_${MES}${ANIO}.pdf`);
+  showToast('📄 Recibo generado y descargado');
+}
+
+// ════════════════════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════════════════════
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError?' error':'');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Pre-fill config input if URL exists
+if (SCRIPT_URL) document.getElementById('scriptUrlInput').value = SCRIPT_URL;
+</script>
+</body>
+</html>
